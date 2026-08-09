@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
 <title>Air Code — Finger Drawing</title>
 
 <!-- MediaPipe Hands -->
@@ -12,7 +12,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
 
 <style>
-*{box-sizing:border-box}
+*{box-sizing:border-box; touch-action:none;}
 html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#05070a;color:#fff;font-family:Arial,sans-serif}
 #camera{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1);filter:brightness(.55) contrast(1.08)}
 #draw{position:fixed;inset:0;width:100%;height:100%;z-index:2;pointer-events:none}
@@ -40,14 +40,14 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#05070a;col
 .status{position:absolute;top:22px;right:25px;padding:9px 13px;border:1px solid #24506a;border-radius:20px;background:rgba(4,12,18,.7);font-size:12px}
 .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#555;margin-right:7px}
 .dot.on{background:#00e5ff;box-shadow:0 0 12px #00e5ff}
-.help{position:absolute;bottom:25px;left:50%;transform:translateX(-50%);padding:12px 18px;border-radius:12px;background:rgba(4,8,12,.72);border:1px solid #263c49;color:#b7c7d0;font-size:13px;text-align:center}
+.help{position:absolute;bottom:70px;left:50%;transform:translateX(-50%);padding:10px 14px;border-radius:12px;background:rgba(4,8,12,.72);border:1px solid #263c49;color:#b7c7d0;font-size:12px;text-align:center;width:90%;max-width:320px}
 .controls{position:absolute;right:25px;bottom:24px;display:flex;gap:8px;pointer-events:auto}
 button{border:1px solid #315263;background:#0b151c;color:#d8f8ff;padding:10px 13px;border-radius:9px;cursor:pointer}
 button:hover{background:#10222c}
 #start{position:fixed;inset:0;z-index:10;background:#05070a;display:grid;place-items:center}
 .panel{text-align:center;width:min(90%,480px);padding:34px;border:1px solid #203846;border-radius:20px;background:#091117;box-shadow:0 0 80px rgba(0,190,255,.08)}
 .panel h1{margin:0 0 10px;font-size:30px}.panel p{color:#91a5b0;line-height:1.6}
-#startBtn{font-size:15px;padding:13px 22px;background:#0b2530;border-color:#00a6d6}
+#startBtn{font-size:15px;padding:13px 22px;background:#0b2530;border-color:#00a6d6;pointer-events:auto}
 .note{font-size:11px;color:#657782;margin-top:14px}
 </style>
 </head>
@@ -57,7 +57,6 @@ button:hover{background:#10222c}
 <canvas id="draw"></canvas>
 <div class="vignette"></div>
 
-
 <div class="footer">Designed &amp; Programmed by <b>@sinan._u</b></div>
 
 <div class="ui">
@@ -65,8 +64,7 @@ button:hover{background:#10222c}
   <div class="status"><span id="dot" class="dot"></span><span id="status">Camera off</span></div>
 
   <div class="help">
-    ☝ Raise your index finger to draw · ✊ Hide/lower it to stop ·
-    <b>Clear</b> to erase
+    ☝ Raise index finger to draw · ✊ Lower finger to stop
   </div>
 
   <div class="controls">
@@ -78,9 +76,9 @@ button:hover{background:#10222c}
 <div id="start">
   <div class="panel">
     <h1>✦ Air Code</h1>
-    <p>Use your webcam and your index finger as a virtual pen. Move your finger through the air and the glowing line will follow it.</p>
+    <p>Use your camera and index finger as a virtual pen.</p>
     <button id="startBtn">Start Camera</button>
-    <div class="note">Camera permission is required. Your video is processed in your browser.</div>
+    <div class="note">Camera permission is required. Must be hosted via HTTPS.</div>
   </div>
 </div>
 
@@ -100,12 +98,11 @@ let drawing = false;
 let colorIndex = 0;
 const colors = ["#00e5ff","#7cff6b","#ff4fd8","#ffd84d","#ffffff"];
 
+const isMobile = /Mobi|Android|iPhone/i.test(navigator.userAgent);
+
 function resize(){
-  canvas.width = innerWidth * devicePixelRatio;
-  canvas.height = innerHeight * devicePixelRatio;
-  canvas.style.width = innerWidth+"px";
-  canvas.style.height = innerHeight+"px";
-  ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
 }
@@ -113,7 +110,7 @@ addEventListener("resize", resize);
 resize();
 
 function clearCanvas(){
-  ctx.clearRect(0,0,innerWidth,innerHeight);
+  ctx.clearRect(0,0,window.innerWidth,window.innerHeight);
   lastX = lastY = null;
 }
 clearBtn.onclick = clearCanvas;
@@ -131,8 +128,11 @@ function drawPoint(x,y){
     ctx.lineCap="round";
     ctx.lineJoin="round";
 
-    ctx.shadowBlur = 22;
-    ctx.shadowColor = color;
+    if(!isMobile){
+      ctx.shadowBlur = 15;
+      ctx.shadowColor = color;
+    }
+
     ctx.strokeStyle = color;
     ctx.lineWidth = 5;
     ctx.beginPath();
@@ -141,8 +141,8 @@ function drawPoint(x,y){
     ctx.stroke();
 
     ctx.shadowBlur = 0;
-    ctx.strokeStyle = "rgba(255,255,255,.75)";
-    ctx.lineWidth = 1.2;
+    ctx.strokeStyle = "rgba(255,255,255,.85)";
+    ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.moveTo(lastX,lastY);
     ctx.lineTo(x,y);
@@ -164,9 +164,9 @@ const hands = new Hands({
 
 hands.setOptions({
   maxNumHands: 1,
-  modelComplexity: 1,
-  minDetectionConfidence: 0.65,
-  minTrackingConfidence: 0.65
+  modelComplexity: isMobile ? 0 : 1,
+  minDetectionConfidence: 0.5,
+  minTrackingConfidence: 0.5
 });
 
 hands.onResults(results=>{
@@ -178,31 +178,43 @@ hands.onResults(results=>{
   }
 
   const lm = results.multiHandLandmarks[0];
+  const tip = lm[8], pip = lm[6];
 
-  // Index fingertip = landmark 8
-  // Index PIP = landmark 6
-  // Wrist = landmark 0
-  const tip=lm[8], pip=lm[6], wrist=lm[0];
+  // Relaxed condition for mobile screen orientation
+  const raised = tip.y < pip.y;
 
-  // Finger is considered raised when fingertip is above PIP.
-  const raised = tip.y < pip.y - 0.035;
-
-  // Avoid drawing when the hand is very low/edge of frame.
-  const visible = tip.x>0.02 && tip.x<0.98 && tip.y>0.03 && tip.y<0.97;
-
-  if(!raised || !visible){
+  if(!raised){
     stopDrawing();
-    statusEl.textContent="Point your index finger";
+    statusEl.textContent="Point index finger up";
     dot.classList.remove("on");
     return;
   }
 
-  /*
-    The video is mirrored with CSS.
-    Convert normalized MediaPipe coordinates to screen coordinates.
-  */
-  const x=(1-tip.x)*innerWidth;
-  const y=tip.y*innerHeight;
+  // Calculate object-fit: cover offsets for mobile screens
+  const vw = video.videoWidth || 640;
+  const vh = video.videoHeight || 480;
+  const sw = window.innerWidth;
+  const sh = window.innerHeight;
+
+  const videoRatio = vw / vh;
+  const screenRatio = sw / sh;
+
+  let scale, offsetX = 0, offsetY = 0;
+
+  if (screenRatio > videoRatio) {
+    scale = sw / vw;
+    offsetY = (sh - vh * scale) / 2;
+  } else {
+    scale = sh / vh;
+    offsetX = (sw - vw * scale) / 2;
+  }
+
+  // Convert mirrored coordinates to screen pixel positions
+  const rawX = (1 - tip.x) * vw;
+  const rawY = tip.y * vh;
+
+  const x = rawX * scale + offsetX;
+  const y = rawY * scale + offsetY;
 
   statusEl.textContent="Drawing";
   dot.classList.add("on");
@@ -223,20 +235,25 @@ startBtn.onclick = async ()=>{
     startBtn.disabled=true;
     startBtn.textContent="Opening camera...";
 
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video:{width:{ideal:1280},height:{ideal:720},facingMode:"user"},
-      audio:false
-    });
+    const constraints = {
+      video: {
+        facingMode: "user",
+        width: { ideal: isMobile ? 640 : 1280 },
+        height: { ideal: isMobile ? 480 : 720 }
+      },
+      audio: false
+    };
 
-    video.srcObject=stream;
+    const stream = await navigator.mediaDevices.getUserMedia(constraints);
+    video.srcObject = stream;
     await video.play();
 
-    camera = new Camera(video,{
-      onFrame: async ()=>{
-        await hands.send({image:video});
+    camera = new Camera(video, {
+      onFrame: async () => {
+        await hands.send({image: video});
       },
-      width:1280,
-      height:720
+      width: isMobile ? 640 : 1280,
+      height: isMobile ? 480 : 720
     });
 
     camera.start();
@@ -246,7 +263,7 @@ startBtn.onclick = async ()=>{
     console.error(err);
     startBtn.disabled=false;
     startBtn.textContent="Try Again";
-    alert("Camera could not be opened. Allow camera permission and run this page from localhost or HTTPS.");
+    alert("Camera permission denied or HTTPS is required on hosted servers.");
   }
 };
 </script>
