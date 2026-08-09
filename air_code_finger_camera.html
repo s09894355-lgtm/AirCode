@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Air Code — Finger Drawing</title>
+
+<!-- MediaPipe Hands -->
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#05070a;color:#fff;font-family:Arial,sans-serif}
+#camera{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1);filter:brightness(.55) contrast(1.08)}
+#draw{position:fixed;inset:0;width:100%;height:100%;z-index:2;pointer-events:none}
+.vignette{position:fixed;inset:0;z-index:3;pointer-events:none;background:radial-gradient(circle,transparent 35%,rgba(0,0,0,.62) 100%)}
+
+.footer{
+  position:fixed;
+  left:50%;
+  bottom:18px;
+  transform:translateX(-50%);
+  z-index:5;
+  color:rgba(255,255,255,.78);
+  font:12px Arial,sans-serif;
+  letter-spacing:.7px;
+  padding:7px 12px;
+  border:1px solid rgba(0,229,255,.18);
+  border-radius:14px;
+  background:rgba(4,10,15,.55);
+  backdrop-filter:blur(8px);
+}
+.footer b{color:#00e5ff;font-weight:600}
+
+.ui{position:fixed;inset:0;z-index:4;pointer-events:none}
+.title{position:absolute;top:24px;left:28px;font-weight:700;letter-spacing:3px;font-size:15px;text-transform:uppercase}
+.status{position:absolute;top:22px;right:25px;padding:9px 13px;border:1px solid #24506a;border-radius:20px;background:rgba(4,12,18,.7);font-size:12px}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#555;margin-right:7px}
+.dot.on{background:#00e5ff;box-shadow:0 0 12px #00e5ff}
+.help{position:absolute;bottom:25px;left:50%;transform:translateX(-50%);padding:12px 18px;border-radius:12px;background:rgba(4,8,12,.72);border:1px solid #263c49;color:#b7c7d0;font-size:13px;text-align:center}
+.controls{position:absolute;right:25px;bottom:24px;display:flex;gap:8px;pointer-events:auto}
+button{border:1px solid #315263;background:#0b151c;color:#d8f8ff;padding:10px 13px;border-radius:9px;cursor:pointer}
+button:hover{background:#10222c}
+#start{position:fixed;inset:0;z-index:10;background:#05070a;display:grid;place-items:center}
+.panel{text-align:center;width:min(90%,480px);padding:34px;border:1px solid #203846;border-radius:20px;background:#091117;box-shadow:0 0 80px rgba(0,190,255,.08)}
+.panel h1{margin:0 0 10px;font-size:30px}.panel p{color:#91a5b0;line-height:1.6}
+#startBtn{font-size:15px;padding:13px 22px;background:#0b2530;border-color:#00a6d6}
+.note{font-size:11px;color:#657782;margin-top:14px}
+</style>
+</head>
+<body>
+
+<video id="camera" autoplay muted playsinline></video>
+<canvas id="draw"></canvas>
+<div class="vignette"></div>
+
+
+<div class="footer">Designed &amp; Programmed by <b>@sinan._u</b></div>
+
+<div class="ui">
+  <div class="title">AIR CODE</div>
+  <div class="status"><span id="dot" class="dot"></span><span id="status">Camera off</span></div>
+
+  <div class="help">
+    ☝ Raise your index finger to draw · ✊ Hide/lower it to stop ·
+    <b>Clear</b> to erase
+  </div>
+
+  <div class="controls">
+    <button id="clearBtn">Clear</button>
+    <button id="colorBtn">Color</button>
+  </div>
+</div>
+
+<div id="start">
+  <div class="panel">
+    <h1>✦ Air Code</h1>
+    <p>Use your webcam and your index finger as a virtual pen. Move your finger through the air and the glowing line will follow it.</p>
+    <button id="startBtn">Start Camera</button>
+    <div class="note">Camera permission is required. Your video is processed in your browser.</div>
+  </div>
+</div>
+
+<script>
+const video = document.getElementById("camera");
+const canvas = document.getElementById("draw");
+const ctx = canvas.getContext("2d");
+const startScreen = document.getElementById("start");
+const startBtn = document.getElementById("startBtn");
+const clearBtn = document.getElementById("clearBtn");
+const colorBtn = document.getElementById("colorBtn");
+const statusEl = document.getElementById("status");
+const dot = document.getElementById("dot");
+
+let lastX = null, lastY = null;
+let drawing = false;
+let colorIndex = 0;
+const colors = ["#00e5ff","#7cff6b","#ff4fd8","#ffd84d","#ffffff"];
+
+function resize(){
+  canvas.width = innerWidth * devicePixelRatio;
+  canvas.height = innerHeight * devicePixelRatio;
+  canvas.style.width = innerWidth+"px";
+  canvas.style.height = innerHeight+"px";
+  ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+}
+addEventListener("resize", resize);
+resize();
+
+function clearCanvas(){
+  ctx.clearRect(0,0,innerWidth,innerHeight);
+  lastX = lastY = null;
+}
+clearBtn.onclick = clearCanvas;
+
+colorBtn.onclick = ()=>{
+  colorIndex = (colorIndex+1)%colors.length;
+  colorBtn.textContent = "Color";
+};
+
+function drawPoint(x,y){
+  const color = colors[colorIndex];
+
+  if(lastX !== null && lastY !== null){
+    ctx.save();
+    ctx.lineCap="round";
+    ctx.lineJoin="round";
+
+    ctx.shadowBlur = 22;
+    ctx.shadowColor = color;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.moveTo(lastX,lastY);
+    ctx.lineTo(x,y);
+    ctx.stroke();
+
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = "rgba(255,255,255,.75)";
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(lastX,lastY);
+    ctx.lineTo(x,y);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  lastX=x; lastY=y;
+}
+
+function stopDrawing(){
+  drawing=false;
+  lastX=lastY=null;
+}
+
+const hands = new Hands({
+  locateFile: file => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+});
+
+hands.setOptions({
+  maxNumHands: 1,
+  modelComplexity: 1,
+  minDetectionConfidence: 0.65,
+  minTrackingConfidence: 0.65
+});
+
+hands.onResults(results=>{
+  if(!results.multiHandLandmarks || !results.multiHandLandmarks.length){
+    stopDrawing();
+    statusEl.textContent="Show your hand";
+    dot.classList.remove("on");
+    return;
+  }
+
+  const lm = results.multiHandLandmarks[0];
+
+  // Index fingertip = landmark 8
+  // Index PIP = landmark 6
+  // Wrist = landmark 0
+  const tip=lm[8], pip=lm[6], wrist=lm[0];
+
+  // Finger is considered raised when fingertip is above PIP.
+  const raised = tip.y < pip.y - 0.035;
+
+  // Avoid drawing when the hand is very low/edge of frame.
+  const visible = tip.x>0.02 && tip.x<0.98 && tip.y>0.03 && tip.y<0.97;
+
+  if(!raised || !visible){
+    stopDrawing();
+    statusEl.textContent="Point your index finger";
+    dot.classList.remove("on");
+    return;
+  }
+
+  /*
+    The video is mirrored with CSS.
+    Convert normalized MediaPipe coordinates to screen coordinates.
+  */
+  const x=(1-tip.x)*innerWidth;
+  const y=tip.y*innerHeight;
+
+  statusEl.textContent="Drawing";
+  dot.classList.add("on");
+
+  if(!drawing){
+    drawing=true;
+    lastX=x; lastY=y;
+    return;
+  }
+
+  drawPoint(x,y);
+});
+
+let camera;
+
+startBtn.onclick = async ()=>{
+  try{
+    startBtn.disabled=true;
+    startBtn.textContent="Opening camera...";
+
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video:{width:{ideal:1280},height:{ideal:720},facingMode:"user"},
+      audio:false
+    });
+
+    video.srcObject=stream;
+    await video.play();
+
+    camera = new Camera(video,{
+      onFrame: async ()=>{
+        await hands.send({image:video});
+      },
+      width:1280,
+      height:720
+    });
+
+    camera.start();
+    startScreen.style.display="none";
+    statusEl.textContent="Show your index finger";
+  }catch(err){
+    console.error(err);
+    startBtn.disabled=false;
+    startBtn.textContent="Try Again";
+    alert("Camera could not be opened. Allow camera permission and run this page from localhost or HTTPS.");
+  }
+};
+</script>
+</body>
+</html>
